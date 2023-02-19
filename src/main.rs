@@ -1,10 +1,11 @@
 use std::collections::HashMap;
+use std::time::Duration;
 use clap::Parser;
 use json::JsonValue;
 use tokio::io::{AsyncWriteExt, AsyncReadExt};
+use tokio::time::timeout;
 use std::error::Error;
 use std::net::{SocketAddr, IpAddr};
-use tokio::net::TcpSocket;
 use std::ops::RangeInclusive;
 
 
@@ -48,7 +49,7 @@ pub fn get_args() -> MyResult<Config<'static>>{
             passw = passw_v.to_string();
         }
     }
-    //this is hashmap stores commands for ups
+    //It is hashmap stores commands for ups
     let commands = HashMap::from([
         ("main_voltage", "O"),
         ("load", "P"),
@@ -70,34 +71,62 @@ pub fn get_args() -> MyResult<Config<'static>>{
 
 
 
+
 #[tokio::main]
 async fn main() {
+    if let Err(e) = run().await {
+        eprintln!("{}", e);
+        std::process::exit(10);
+    }
+}
+
+
+
+async fn run() -> MyResult<()>{
     let config = get_args().unwrap();
     dbg!(&config);
     let remote_addr: SocketAddr = SocketAddr::new(config.addr, config.port);
     
-    let socket = TcpSocket::new_v4().unwrap();
-    const MAX_DATAGRAM_SIZE: usize = 10;
-    
-    let mut strem = socket.connect(remote_addr).await.unwrap();
-    
+    const MAX_DATAGRAM_SIZE: usize = 5;
+    const CONNECTION_TIME: u64 = 5;
 
-    //dbg!(&socket);
-    let mut json_data = JsonValue::new_object();
-    for (name, command) in config.commands{
-            let mut data = vec![0u8; MAX_DATAGRAM_SIZE];
+    let _ = match tokio::time::timeout(
+        Duration::from_secs(CONNECTION_TIME),
+        tokio::net::TcpStream::connect(remote_addr)
+    )
+    .await?
+    {
+        Ok(mut stream) => {
+            dbg!(&stream); 
             
-            strem.write(command.as_bytes()).await.unwrap();
-            //socket.send(command.as_str().as_bytes()).await.unwrap();
-            
-            let len = strem.read(&mut data).await.unwrap();
-            
-            let res  = String::from_utf8_lossy(&data[..len]).to_string();
-            json_data[name] = res.into();
-    }
+
+            let mut json_data = JsonValue::new_object();
+            for (name, command) in config.commands{
+                    let mut data = vec![0u8; MAX_DATAGRAM_SIZE];
+                    
+                    stream.write(command.as_bytes()).await?;
+                    let my_duration = tokio::time::Duration::from_secs(5);
+                    while let Ok(len) = timeout(my_duration, stream.read(&mut data)).await? {
+                        let res  = String::from_utf8_lossy(&data[..len]).to_string();
+                        json_data[name] = res.into();
+                        break;
+                        }
+                                    
+                }
     
-    println!("{}", json_data);
+    println!("{}", json_data);   
+            
+        }
+        Err(e) => panic!("{}", format!("timeout while connecting to server : {}", e)),
+    };
+
+
+
+    Ok(())
 }
+
+
+
 
 /// This func check valid number port
 fn port_in_range(s: &str) -> Result<u16, String> {
