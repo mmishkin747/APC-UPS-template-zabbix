@@ -35,8 +35,7 @@ pub struct Config <'a> {
     port: u16,
     user: String,
     passw: String,
-    commands: HashMap<String, String>,
-    testhash: HashMap<&'a str, &'a str>
+    commands: HashMap<&'a str, &'a str>
 }
 
 pub fn get_args() -> MyResult<Config<'static>>{
@@ -51,20 +50,13 @@ pub fn get_args() -> MyResult<Config<'static>>{
     }
     //this is hashmap stores commands for ups
     let commands = HashMap::from([
-        ("main_voltage".to_string(), "O".to_string()),
-        ("load".to_string(), "P".to_string()),
-        ("temperature".to_string(), "C".to_string()),
-        ("charge_battaries".to_string(), "0".to_string()),
-        ("workin_hour".to_string(), "j".to_string()),
+        ("main_voltage", "O"),
+        ("load", "P"),
+        ("temperature", "C"),
+        ("charge_battaries", "0"),
+        ("workin_hour", "j"),
         
     ]);
-
-    let testhash: HashMap<&str, &str> = HashMap::from(
-        [
-            ("testkey", "testval"),
-        ]
-    );
-
 
     Ok(Config {
         addr: cli.ipaddr,
@@ -72,7 +64,6 @@ pub fn get_args() -> MyResult<Config<'static>>{
         user,
         passw,
         commands,
-        testhash,
 
     })
 }
@@ -89,16 +80,14 @@ async fn main() {
     const MAX_DATAGRAM_SIZE: usize = 10;
     
     let mut strem = socket.connect(remote_addr).await.unwrap();
-    for (testkey, testval) in config.testhash{
-        dbg!(&testkey, &testval);
-    }
+    
 
     //dbg!(&socket);
     let mut json_data = JsonValue::new_object();
     for (name, command) in config.commands{
             let mut data = vec![0u8; MAX_DATAGRAM_SIZE];
             
-            strem.write(command.as_str().as_bytes()).await.unwrap();
+            strem.write(command.as_bytes()).await.unwrap();
             //socket.send(command.as_str().as_bytes()).await.unwrap();
             
             let len = strem.read(&mut data).await.unwrap();
