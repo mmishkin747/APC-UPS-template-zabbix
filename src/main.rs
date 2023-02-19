@@ -1,11 +1,10 @@
 use std::collections::HashMap;
-use std::time::Duration;
 use clap::Parser;
 use json::JsonValue;
 use tokio::io::{AsyncWriteExt, AsyncReadExt};
-use tokio::time::timeout;
+use tokio::time::{timeout, Duration};
 use std::error::Error;
-use std::net::{SocketAddr, IpAddr};
+use std::net::{SocketAddr, IpAddr,};
 use std::ops::RangeInclusive;
 
 
@@ -98,15 +97,14 @@ async fn run() -> MyResult<()>{
     {
         Ok(mut stream) => {
             dbg!(&stream); 
-            
-
+        
             let mut json_data = JsonValue::new_object();
             for (name, command) in config.commands{
                     let mut data = vec![0u8; MAX_DATAGRAM_SIZE];
                     
                     stream.write(command.as_bytes()).await?;
-                    let my_duration = tokio::time::Duration::from_secs(5);
-                    while let Ok(len) = timeout(my_duration, stream.read(&mut data)).await? {
+                    let read_timeout = Duration::from_secs(5);
+                    while let Ok(len) = timeout(read_timeout, stream.read(&mut data)).await? {
                         let res  = String::from_utf8_lossy(&data[..len]).to_string();
                         json_data[name] = res.into();
                         break;
