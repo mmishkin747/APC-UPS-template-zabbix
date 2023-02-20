@@ -6,6 +6,7 @@ use tokio::time::{timeout, Duration};
 use std::error::Error;
 use std::net::{SocketAddr, IpAddr,};
 use std::ops::RangeInclusive;
+use std::thread::sleep;
 
 
 type MyResult<T> = Result<T, Box<dyn Error>>;
@@ -54,22 +55,16 @@ pub fn get_args() -> MyResult<Config<'static>>{
         ("load", "P"),
         ("temperature", "C"),
         ("charge_battaries", "0"),
-        ("workin_hour", "j"),
-        
+        ("workin_hour", "j"),   
     ]);
-
     Ok(Config {
         addr: cli.ipaddr,
         port: cli.port,
         user,
         passw,
         commands,
-
     })
 }
-
-
-
 
 #[tokio::main]
 async fn main() {
@@ -86,7 +81,7 @@ async fn run() -> MyResult<()>{
     dbg!(&config);
     let remote_addr: SocketAddr = SocketAddr::new(config.addr, config.port);
     
-    const MAX_DATAGRAM_SIZE: usize = 5;
+    const MAX_DATAGRAM_SIZE: usize = 100;
     const CONNECTION_TIME: u64 = 5;
 
     let _ = match tokio::time::timeout(
@@ -97,6 +92,7 @@ async fn run() -> MyResult<()>{
     {
         Ok(mut stream) => {
             dbg!(&stream); 
+            sleep(Duration::from_secs(1));
         
             let mut json_data = JsonValue::new_object();
             for (name, command) in config.commands{
@@ -108,8 +104,7 @@ async fn run() -> MyResult<()>{
                         let res  = String::from_utf8_lossy(&data[..len]).to_string();
                         json_data[name] = res.into();
                         break;
-                        }
-                                    
+                        }       
                 }
     
     println!("{}", json_data);   
@@ -117,14 +112,8 @@ async fn run() -> MyResult<()>{
         }
         Err(e) => panic!("{}", format!("timeout while connecting to server : {}", e)),
     };
-
-
-
     Ok(())
 }
-
-
-
 
 /// This func check valid number port
 fn port_in_range(s: &str) -> Result<u16, String> {
